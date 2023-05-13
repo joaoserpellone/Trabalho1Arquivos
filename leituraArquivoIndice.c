@@ -3,27 +3,24 @@
 #include "registroIndice.h"
 #include "leituraArquivoIndice.h"
 
-REG_INDICE_INT** leituraArquivoIndiceInt(char *nomeArqIndice){
+REG_INDICE_INT** leituraArquivoIndiceInt(char *nomeArqIndice, int *qtdReg){
     FILE *arqIndice = fopen(nomeArqIndice, "rb");
     //leitura do cabecalho do arquivo
     fgetc(arqIndice);
-
-    //declaração de variaveis
-    REG_INDICE_INT **vetor = NULL;
-    int cont = 0;
+    //leitura da quantidade de registro de indices
+    fread(qtdReg, 4, 1, arqIndice);
+    //declaração de variaveis e aslocacao de vetor de indices
+    REG_INDICE_INT **vetor = malloc((*qtdReg)*sizeof(REG_INDICE_INT*));
     int chaveBusca;
     long int byteOffSet;
     //loop de leitura
-    while(!feof(arqIndice)){
-        //realoca vetor
-        vetor = realloc(vetor, (cont + 1)*sizeof(REG_INDICE_INT*));
+    for(int i = 0; i < *qtdReg; i++){
 
         //leitura do arqIndice e adiciona ao vetor
         fread(&chaveBusca, 4, 1, arqIndice);
         fread(&byteOffSet, 8, 1, arqIndice);
-        vetor[cont] = criaRegIndiceInt(chaveBusca, byteOffSet);
-        //incrementa contador
-        cont++;
+        vetor[i] = criaRegIndiceInt(chaveBusca, byteOffSet);
+
     }
 
     fclose(arqIndice);
@@ -41,19 +38,18 @@ void eliminaSifrao(char *str){
     str[i] = '\0';
 }
 
-REG_INDICE_STR** leituraArquivoIndiceStr(char *nomeArqIndice){
+REG_INDICE_STR** leituraArquivoIndiceStr(char *nomeArqIndice, int *qtdReg){
     FILE *arqIndice = fopen(nomeArqIndice, "rb");
     //leitura do cabecalho do arquivo
-    //declaração de variaveis
-    REG_INDICE_STR **vetor = NULL;
-    int cont = 0;
+    fgetc(arqIndice);
+    //leitura da quantidade de registro de indices
+    fread(qtdReg, 4, 1, arqIndice);
+    //declaração de variaveis e aslocacao de vetor de indices
+    REG_INDICE_STR **vetor = malloc((*qtdReg)*sizeof(REG_INDICE_STR*));
     char chaveBusca[13];
     long int byteOffSet;
     //loop de leitura
-    while(!feof(arqIndice)){
-        //realoca vetor
-        vetor = realloc(vetor, (cont + 1)*sizeof(REG_INDICE_STR*));
-
+    for(int i = 0; i < *qtdReg; i++){
         //leitura do arqIndice e adiciona ao vetor
         fread(&chaveBusca, 12, 1, arqIndice);
         fread(&byteOffSet, 8, 1, arqIndice);
@@ -61,10 +57,8 @@ REG_INDICE_STR** leituraArquivoIndiceStr(char *nomeArqIndice){
         chaveBusca[12] = '\0';
 
         eliminaSifrao(chaveBusca);
-        vetor[cont] = criaRegIndiceStr(chaveBusca, byteOffSet);
+        vetor[i] = criaRegIndiceStr(chaveBusca, byteOffSet);
 
-        //incrementa contador
-        cont++;
     }
     fclose(arqIndice);
     return vetor;

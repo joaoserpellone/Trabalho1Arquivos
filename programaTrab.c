@@ -15,6 +15,8 @@
 #include "registroIndice.h"
 #include "escreveArquivoIndice.h"
 #include "selectFromWhere.h"
+#include "deletFromWhere.h"
+
 
 void readline(char *string) {
     char c = 0;
@@ -213,8 +215,72 @@ int main() {
 
         scanf("%s %s %s %s %d", arquivoEntrada, campoIndexado, tipoDado, nomeArqIndice, &n);
 
-        selectFromWhere(arquivoEntrada, campoIndexado, tipoDado, nomeArqIndice, n);
+        FILE *arqBin = fopen(arquivoEntrada, "rb");
+
+        //abre o arquivo binario para leitura e, caso Nulo, retorna mensagem de erro
+        if(arqBin == NULL){
+            printf("Falha no processamento do arquivo.");
+            return 0;
+        }
+
+        //lê o cabecalho e checa se o arquivo é consistente
+   		CABECALHO *cabecalho = leituraCabecalho(arqBin);
+   		if(getStatusCabecalho(cabecalho) == '0'){
+   			printf("Falha no processamento do arquivo.");
+   			return 0;
+   		}
+   		
+   		//checa se o número de registros é zero ou se o numero de registros é igual ao numero de registros marcados como removidos e printa a mensagem de erro caso necessário
+   		if(getNroRegArqCabecalho(cabecalho) == 0 || getNroRegArqCabecalho(cabecalho) == getNroRegRemCabecalho(cabecalho)){
+   			printf("Registro inexistente.");
+   			return 0;
+   		}
+
+        if(strcmp(tipoDado, "inteiro") == 0)
+            selectFromWhereInt(arqBin, cabecalho, campoIndexado, nomeArqIndice, n);
+        else if(strcmp(tipoDado, "string") == 0)
+            selectFromWhereStr(arqBin, cabecalho, campoIndexado, nomeArqIndice, n);
+
+        fclose(arqBin);
+    }
+    else if(funcionalidade == 5){
+        char arquivoEntrada[15];
+        char campoIndexado[15];
+        char tipoDado[15];
+        char nomeArqIndice[15];
+        int n;
+
+        scanf("%s %s %s %s %d", arquivoEntrada, campoIndexado, tipoDado, nomeArqIndice, &n);
+
+        FILE *arqBin = fopen(arquivoEntrada, "rb+");
+
+        //abre o arquivo binario para leitura e, caso Nulo, retorna mensagem de erro
+        if(arqBin == NULL){
+            printf("Falha no processamento do arquivo.");
+            return 0;
+        }
+
+        //lê o cabecalho e checa se o arquivo é consistente
+   		CABECALHO *cabecalho = leituraCabecalho(arqBin);
+   		if(getStatusCabecalho(cabecalho) == '0'){
+   			printf("Falha no processamento do arquivo.");
+   			return 0;
+   		}
+   		
+   		//checa se o número de registros é zero ou se o numero de registros é igual ao numero de registros marcados como removidos e printa a mensagem de erro caso necessário
+   		if(getNroRegArqCabecalho(cabecalho) == 0 || getNroRegArqCabecalho(cabecalho) == getNroRegRemCabecalho(cabecalho)){
+   			printf("Registro inexistente.");
+   			return 0;
+   		}
+
+        if(strcmp(tipoDado, "inteiro") == 0)
+            deletFromWhereInt(arqBin, cabecalho, campoIndexado, nomeArqIndice, n);
+
+        fclose(arqBin);
+        
+        binarioNaTela(arquivoEntrada);
+        binarioNaTela(nomeArqIndice);        
     }
 
-
+    return 0;
 }

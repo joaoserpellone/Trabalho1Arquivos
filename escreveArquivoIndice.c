@@ -124,6 +124,8 @@ void cria_arquivo_indice_int(FILE *arqBin, CABECALHO *cabecalho, char *nomeArqIn
     //status = 0 (arquivo inconsitente)
     char status = '0';
     fwrite(&status, 1, 1, arqIndice);
+    //qtdReg = cont
+    fwrite(&cont, 4, 1, arqIndice);
 
     //escreve  os registros no arquivo de indices
     for(int i = 0; i<cont; i++){
@@ -139,6 +141,32 @@ void cria_arquivo_indice_int(FILE *arqBin, CABECALHO *cabecalho, char *nomeArqIn
     fwrite(&status, 1, 1, arqIndice);
 
     fclose(arqIndice);
+}
+
+void escreve_arquivo_indice_int(REG_INDICE_INT **r, char *nomeArquivo){
+    FILE *arqIndices = fopen(nomeArquivo, "wb");
+
+    //escrita previa no cabecalho
+    char status = '0';
+    int qtdReg = 0;
+    fwrite(&status, 1, 1, arqIndices);
+    fwrite(&qtdReg, 4, 1, arqIndices);
+
+    //escrita dos registros no arquivo
+    for(int i = 0; i < sizeof(r)/sizeof(REG_INDICE_INT*); i++){
+        qtdReg++;
+        int chaveBusca = getChaveBuscaRegIndiceInt(r[i]);
+        long int byteOffSet = getByteOffSetIndiceInt(r[i]);
+        fwrite(&chaveBusca, 4, 1, arqIndices);
+        fwrite(&byteOffSet, 8, 1, arqIndices);
+    }
+
+    qtdReg++;
+    //atualiza cabecalho e fecha arquivo
+    fseek(arqIndices, 0, SEEK_SET);
+    fwrite(&qtdReg, 4, 1, arqIndices);
+
+    fclose(arqIndices);
 }
 
 /*
@@ -285,6 +313,8 @@ void cria_arquivo_indice_str(FILE *arqBin, CABECALHO *cabecalho, char *nomeArqIn
     //status = 0 (arquivo inconsitente)
     char status = '0';
     fwrite(&status, 1, 1, arqIndice);
+    //qtdReg = cont
+    fwrite(&cont, 4, 1, arqIndice);
 
     //escreve  os registros no arquivo de indices
     for(int i = 0; i<cont; i++){

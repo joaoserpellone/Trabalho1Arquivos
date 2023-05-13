@@ -27,8 +27,9 @@ FICHA_CRIME *criaFichaCrime(char removido, int idCrime, char *dataCrime, int num
         strcpy(f->lugarCrime, lugarCrime);
         strcpy(f->descricaoCrime, descricaoCrime);
        
-       return f;
     }
+
+    return f;
 }
 
 void printRegistro(FICHA_CRIME *f){
@@ -87,6 +88,55 @@ char *getLugarCrime(FICHA_CRIME *f){
 char *getDescricaoCrime(FICHA_CRIME *f){
     if(f != NULL){
         return f->descricaoCrime;
+    }
+    exit(1);
+}
+
+void setRemovido(FICHA_CRIME *f, char removido){
+    if(f != NULL){
+        f->removido = removido;
+    }
+    exit(1);
+}
+
+void setIdCrime(FICHA_CRIME *f, int idCrime){
+    if(f != NULL){
+        f->idCrime = idCrime;
+    }
+    exit(1);
+}
+
+void setDataCrime(FICHA_CRIME *f, char *dataCrime){
+    if(f != NULL){
+        strcpy(f->dataCrime, dataCrime);
+    }
+    exit(1);
+}
+
+void setNumeroArtigo(FICHA_CRIME *f, int numeroArtigo){
+    if(f != NULL){
+        f->numeroArtigo = numeroArtigo;
+    }
+    exit(1);
+}
+
+void setMarcaCelular(FICHA_CRIME *f, char *marcaCelular){
+    if(f != NULL){
+        strcpy(f->marcaCelular, marcaCelular);
+    }
+    exit(1);
+}
+
+void setLugarCrime(FICHA_CRIME *f, char *lugarCrime){
+    if(f != NULL){
+        strcpy(f->lugarCrime, lugarCrime);
+    }
+    exit(1);
+}
+
+void setDescricaoCrime(FICHA_CRIME *f, char *descricaoCrime){
+    if(f != NULL){
+        strcpy(f->descricaoCrime, descricaoCrime);
     }
     exit(1);
 }

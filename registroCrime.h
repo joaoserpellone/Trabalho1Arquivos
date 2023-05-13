@@ -35,6 +35,27 @@
     //retorna descricaoCrime de FICHA_CRIME f
     char *getDescricaoCrime(FICHA_CRIME *f);
 
+    //atribui o parametro removido ao campo removido de FICHA_CRIME f 
+    void setRemovido(FICHA_CRIME *f, char removido);
+
+    //atribui o parametro idCrime ao campo idCrime de FICHA_CRIME f 
+    void setIdCrime(FICHA_CRIME *f, int idCrime);
+    
+    //atribui o parametro dataCrime ao campo dataCrime de FICHA_CRIME f
+    void setDataCrime(FICHA_CRIME *f, char *dataCrime);
+
+    //atribui o parametro numeroArtigo ao campo numeroArtigo de FICHA_CRIME f
+    void setNumeroArtigo(FICHA_CRIME *f, int numeroArtigo);
+
+    //atribui o parametro marcaCelular ao campo marcaCelular de FICHA_CRIME f
+    void setMarcaCelular(FICHA_CRIME *f, char *marcaCelular);
+
+    //atribui o parametro lugarCrime ao campo lugarCrime de FICHA_CRIME f
+    void setLugarCrime(FICHA_CRIME *f, char *lugarCrime);
+
+    //atribui o parametro descricaoCrime ao campo descricaoCrime de FICHA_CRIME f
+    void setDescricaoCrime(FICHA_CRIME *f, char *descricaoCrime);
+
     //libera o espaco em memoria de *f
     void destroiFichaCrime(FICHA_CRIME **f);
 

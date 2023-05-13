@@ -1,4 +1,4 @@
-#include "selectFromWhere.h"
+#include "deletFromWhere.h"
 #include "registroIndice.h"
 #include "registroCabecalho.h"
 #include "registroCrime.h"
@@ -6,10 +6,11 @@
 #include <stdlib.h>
 #include "leituraArquivoIndice.h"
 #include "leituraBinario.h"
+#include "escreveArquivoIndice.h"
 #include <string.h>
 #include <ctype.h>
 
-void scan_quote_string(char *str) {
+void delet_scan_quote_string(char *str) {
     /*
      * Use essa função para ler um campo string delimitado entre aspas (").
      * Chame ela na hora que for ler tal campo. Por exemplo:
@@ -55,7 +56,7 @@ void scan_quote_string(char *str) {
 *   Função que aloca um vetor de strings 
 *    de 15 bytes de tamanho
 */
-char** alocaVetorString(int m){
+char** delet_alocaVetorString(int m){
     char **vetor = malloc(m*sizeof(char *));
 
     if(vetor != NULL){
@@ -67,7 +68,7 @@ char** alocaVetorString(int m){
     }
 }
 
-void destroiVetorString(char **vetor, int m){
+void delet_destroiVetorString(char **vetor, int m){
     for(int i = 0; i < m; i++)
         free(vetor[i]);
     free(vetor);
@@ -78,7 +79,7 @@ void destroiVetorString(char **vetor, int m){
 *   o valor de campo buscado naquele registro
 *   (retorna 1 caso verdadeiro)
 */
-int checaCondicoes(FICHA_CRIME *fichaCrime, char *nomeCampo, char *valorCampo){
+int delet_checaCondicoes(FICHA_CRIME *fichaCrime, char *nomeCampo, char *valorCampo){
     if(strcmp(nomeCampo, "idCrime") == 0)
         return getIdCrime(fichaCrime) == (atoi(valorCampo));
 
@@ -111,12 +112,12 @@ int checaCondicoes(FICHA_CRIME *fichaCrime, char *nomeCampo, char *valorCampo){
 *   satisfaz a busca, comparando os valores de campos
 *   passados como parametros de busca
 */
-int verificaCampos(FICHA_CRIME *fichaCrime, int m, char **nomesCampos, char **valoresCampos, int campoEscolhido){
+int delet_verificaCampos(FICHA_CRIME *fichaCrime, int m, char **nomesCampos, char **valoresCampos, int campoEscolhido){
     //verifica se campos satisfazem a busca
     int flagAchou = 0;
     int i = 0;
-    int flagPrint = 1;
-    while(i < m && flagPrint == 1){
+    int flagDelet = 1;
+    while(i < m && flagDelet == 1){
         //nao checa condicoes de busca sobre campo escolhido pois ja foi verificado
         if(i == campoEscolhido){
             i++;
@@ -124,15 +125,14 @@ int verificaCampos(FICHA_CRIME *fichaCrime, int m, char **nomesCampos, char **va
         }
         //checa condicoes para registros nao removidos
         if(getRemovido(fichaCrime) == '0')
-            flagPrint = checaCondicoes(fichaCrime, nomesCampos[i], valoresCampos[i]);
+            flagDelet = delet_checaCondicoes(fichaCrime, nomesCampos[i], valoresCampos[i]);
         else
-            flagPrint = 0;
+            flagDelet = 0;
 
         i++;
     }
-    //caso todos as condições de busca foram satisfeitas e registro nao foi removidoS, printa registro
-    if(flagPrint == 1){
-        printRegistro(fichaCrime);
+    //caso todos as condições de busca foram satisfeitas e registro nao foi removidoS, lanca a flag para remover registro
+    if(flagDelet == 1){
         flagAchou = 1;
     }
 
@@ -140,13 +140,38 @@ int verificaCampos(FICHA_CRIME *fichaCrime, int m, char **nomesCampos, char **va
 }
 
 /*
-*   Funcao que busca linearmente registros
-*   de acordo com os requisitos de busca
+*   Função que busca linearmente um registro indices
+*   pelo byteOffSet e eretorna sua posicao no vetor de indices
 */
-void buscaLinear(FILE *arqBin, CABECALHO *cabecalho, int m, char **nomesCampos, char **valoresCampos){
+int buscaIndiceRemovidoInt(REG_INDICE_INT **indices, long int byteOffSet){
+    for(int i = 0; i < sizeof(indices)/sizeof(REG_INDICE_INT*); i++){
+        if(getByteOffSetIndiceInt(indices[i]) == byteOffSet)
+            return i;
+    }
+
+    return -1;
+}
+
+void shiftVetorIndicesInt(REG_INDICE_INT **indices, int k){
+    if(k != -1){
+        for(int i = k; i < sizeof(indices)/sizeof(REG_INDICE_INT*) - 1; i++){
+            setChaveBuscaRegIndiceInt(indices[i], getChaveBuscaRegIndiceInt(indices[i+1]));
+            setByteOffSetIndiceInt(indices[i], getByteOffSetIndiceInt(indices[i+1]));
+        }
+        indices = realloc(indices, sizeof(indices) - 1);
+    }
+}
+
+/*
+*   Funcao que remove com uma busca linear registros
+*   de acordo com os requisitos de busca,
+*    retorna 
+*/
+void removeLinearInt(FILE *arqBin, CABECALHO *cabecalho, int m,char **nomesCampos, char **valoresCampos, REG_INDICE_INT **indices, int *qtdIndicesRem){
+    fseek(arqBin, 0, SEEK_SET);
 
     FICHA_CRIME *fichaCrime;
-    fseek(arqBin, 0, SEEK_SET);
+    long int byteOffSet = 17;
 
     //flagPrintInexistente = 1 não achou registro, flag = 0 achou registros
     int flagPrintInexistente = 1;
@@ -156,28 +181,70 @@ void buscaLinear(FILE *arqBin, CABECALHO *cabecalho, int m, char **nomesCampos, 
         fichaCrime = leituraBinario(arqBin);
 
         //verifica se registro satisfaz os criteiros de busca
-        int flagAchou = verificaCampos(fichaCrime, m, nomesCampos, valoresCampos, -1);
+        int flagAchou = delet_verificaCampos(fichaCrime, m, nomesCampos, valoresCampos, -1);
 
-        if(flagAchou == 1 && getRemovido(fichaCrime) != '1')
+        //satisfez criterio de buscas
+        if(flagAchou == 1 && getRemovido(fichaCrime) != '1'){
             flagPrintInexistente = 0;
+            char removido = '1';
+            //altera removido para '1' no arquivo de registros
+            setRemovido(fichaCrime, removido);
+
+            printRegistro(fichaCrime);
+
+            //aponta para o comeco do registro e escreve o removido
+            fseek(arqBin, byteOffSet, SEEK_SET);
+            fwrite(&removido, 1, 1, arqBin);
+
+            //busca no vetor de indices o registro com o mesmo byteOffSet e shifta o vetor
+            int k = buscaIndiceRemovidoInt(indices, byteOffSet);
+            shiftVetorIndicesInt(indices, k);
+
+            //atualiza contador de removidos
+            *qtdIndicesRem++;
+        }
+        //calcula o byteOffSet do proximo registro        
+        byteOffSet += calculaTamFichaCrime(fichaCrime);
         destroiFichaCrime(&fichaCrime);
     }
+        
+}
 
-    if(flagPrintInexistente)
-        printf("Registro inexistente.\n");
-        }
+/*
+*   Função que atualiza a qtdRegRem do
+*    cabecalho do arquivo de registros 
+*   após todas as remoções feitas
+*/
+void atualizaCabecalhoRemovidos(FILE *arqBin, int qtdIndicesRem){
 
-void selectFromWhereInt(FILE *arqBin, CABECALHO *cabecalho, char *campoIndexado, char *nomeArqIndice, int n){
-    //faz leitura do arquivo de indices
+    //leitura de qtde de registros removidos do arquivo de registros
+    fseek(arqBin, 13, SEEK_SET);
+    int qtdRegRem;
+    fread(&qtdRegRem, 4, 1, arqBin);
+
+    //soma os registros removidos aos previamente removidos
+    //e atualiza no arquivo
+    qtdRegRem += qtdIndicesRem;
+    fseek(arqBin, 13, SEEK_SET);
+    fwrite(&qtdRegRem, 4, 1, arqBin);
+
+}
+
+void deletFromWhereInt(FILE *arqBin, CABECALHO *cabecalho, char *campoIndexado, char *nomeArqIndice, int n){
+    //qtde de registros de indices
     int qtdReg = 0;
+    //qtde de registros de indices removidos
+    int qtdIndicesRem = 0;
+
+    //faz leitura do arquivo de indices
     REG_INDICE_INT **indices = leituraArquivoIndiceInt(nomeArqIndice, &qtdReg);
     //numero de pares de busca
     int m;
     for(int i=0; i<n; i++){
         scanf("%d", &m);
         //vetores para aramzenar os pares de busca
-        char **nomesCampos = alocaVetorString(m);
-        char **valoresCampos = alocaVetorString(m);
+        char **nomesCampos = delet_alocaVetorString(m);
+        char **valoresCampos = delet_alocaVetorString(m);
 
         /*  caso exista um campo que esta indexado
         *   a busca partirá desse campo
@@ -190,7 +257,7 @@ void selectFromWhereInt(FILE *arqBin, CABECALHO *cabecalho, char *campoIndexado,
         //leitura dos m pares de busca
         for(int j=0; j<m; j++){
             scanf("%s ", nomesCampos[j]);
-            scan_quote_string(valoresCampos[j]);
+            delet_scan_quote_string(valoresCampos[j]);
 
             //verifica se campo esta indexado
             if(strcmp(nomesCampos[j], campoIndexado) == 0){
@@ -199,19 +266,19 @@ void selectFromWhereInt(FILE *arqBin, CABECALHO *cabecalho, char *campoIndexado,
             }
         }
 
-        printf("Resposta para a busca %d\n", i+1);
         //busca por campo indexado
         if(flag){
+            printf("Remocao indexada: ");
             //transforma o valor do campo escolhido em int  
             int valorCampoEscolhido = atoi(valoresCampos[campoEscolhido]);
-            //busca uma chave de busca igual ao valor do campo escolhido
+
             FICHA_CRIME *fichaCrime;
 
             //flagPrintInexistente = 1 não achou registro, flag = 0 achou registros
             int flagPrintInexistente = 1;
             //itera sobre as chaves de busca ate achar indice igual ao valor escolhido sobre campo
             //ou até o fim dos indices
-            for(int k = 0; k < qtdReg; k++){
+            for(int k = 0; k < qtdReg - qtdIndicesRem; k++){
                 if(valorCampoEscolhido == getChaveBuscaRegIndiceInt(indices[k])){
                     //calcula byteOffSet e aponta para a posição calculada
                     long int byteOffSet = getByteOffSetIndiceInt(indices[k]);
@@ -219,29 +286,43 @@ void selectFromWhereInt(FILE *arqBin, CABECALHO *cabecalho, char *campoIndexado,
                     fichaCrime = leituraBinario(arqBin);
                     
                     //verifica os campos do registro
-                    int flagAchou = verificaCampos(fichaCrime, m, nomesCampos, valoresCampos, campoEscolhido);
+                    int flagAchou = delet_verificaCampos(fichaCrime, m, nomesCampos, valoresCampos, campoEscolhido);
 
-                    if(flagAchou == 1)
+                    if(flagAchou == 1){
                         flagPrintInexistente = 0;
+                        char removido = '1';
+                        //altera removido para '1' no arquivo de registros
+                        fseek(arqBin, -1*calculaTamFichaCrime(fichaCrime), SEEK_CUR);
+                        fwrite(&removido, 1, 1, arqBin);
+
+                        //remove registro do vetor de indices shiftando o vetor
+                        shiftVetorIndicesInt(indices, k);
+
+                        //atualiza a contagem de registros removidos
+                        qtdIndicesRem++;
+                        printRegistro(fichaCrime);
+                    }
 
                     destroiFichaCrime(&fichaCrime);
                 }
+
                 //ja passou do indice de busca
                 if(getChaveBuscaRegIndiceInt(indices[k]) > valorCampoEscolhido)
                     break;
             }
-
-            //não achou registros que satisfazem as condições de busca
             if(flagPrintInexistente)
-                printf("Registro inexistente.\n");
+                    printf("Num Acho\n");
         }                    
-        else{   //busca linear
-            buscaLinear(arqBin, cabecalho, m, nomesCampos, valoresCampos);
+        else{   //remocao linear
+            removeLinearInt(arqBin, cabecalho, m, nomesCampos, valoresCampos, indices, &qtdIndicesRem);
         }
 
-        destroiVetorString(nomesCampos, m);
-        destroiVetorString(valoresCampos, m);
+        delet_destroiVetorString(nomesCampos, m);
+        delet_destroiVetorString(valoresCampos, m);
     } 
+
+    atualizaCabecalhoRemovidos(arqBin, qtdIndicesRem);
+    escreve_arquivo_indice_int(indices, nomeArqIndice);
 
     //apaga vetor de indices
     for(int j = 0; j<qtdReg; j++)
@@ -249,7 +330,7 @@ void selectFromWhereInt(FILE *arqBin, CABECALHO *cabecalho, char *campoIndexado,
     free(indices);
 }
 
-void selectFromWhereStr(FILE *arqBin, CABECALHO *cabecalho, char *campoIndexado, char *nomeArqIndice, int n){
+void deletFromWhereStr(FILE *arqBin, CABECALHO *cabecalho, char *campoIndexado, char *nomeArqIndice, int n){
     int qtdReg = 0;
     //faz leitura do arquivo de indices
     REG_INDICE_STR **indices = leituraArquivoIndiceStr(nomeArqIndice, &qtdReg);
@@ -258,8 +339,8 @@ void selectFromWhereStr(FILE *arqBin, CABECALHO *cabecalho, char *campoIndexado,
     for(int i=0; i<n; i++){
         scanf("%d", &m);
         //vetores para aramzenar os pares de busca
-        char **nomesCampos = alocaVetorString(m);
-        char **valoresCampos = alocaVetorString(m);
+        char **nomesCampos = delet_alocaVetorString(m);
+        char **valoresCampos = delet_alocaVetorString(m);
 
         /*  caso exista um campo que esta indexado
         *   a busca partirá desse campo
@@ -272,7 +353,7 @@ void selectFromWhereStr(FILE *arqBin, CABECALHO *cabecalho, char *campoIndexado,
         //leitura dos m pares de busca
         for(int j=0; j<m; j++){
             scanf("%s", nomesCampos[j]);
-            scan_quote_string(valoresCampos[j]);
+            delet_scan_quote_string(valoresCampos[j]);
 
             //verifica se campo esta indexado
             if(strcmp(nomesCampos[j], campoIndexado) == 0){
@@ -283,7 +364,6 @@ void selectFromWhereStr(FILE *arqBin, CABECALHO *cabecalho, char *campoIndexado,
                 valoresCampos[campoEscolhido][12] = '\0';
             }
         }
-        printf("Resposta para a busca %d\n", i+1);
         //busca por campo indexado
         if(flag){
             FICHA_CRIME *fichaCrime;
@@ -299,7 +379,7 @@ void selectFromWhereStr(FILE *arqBin, CABECALHO *cabecalho, char *campoIndexado,
                     fseek(arqBin, byteOffSet, SEEK_SET);
                     fichaCrime = leituraBinario(arqBin);
                     //verifica os campos do registro
-                    int flagAchou = verificaCampos(fichaCrime, m, nomesCampos, valoresCampos, campoEscolhido);
+                    int flagAchou = delet_verificaCampos(fichaCrime, m, nomesCampos, valoresCampos, campoEscolhido);
 
                     if(flagAchou == 1)
                         flagPrintInexistente = 0;
@@ -309,13 +389,10 @@ void selectFromWhereStr(FILE *arqBin, CABECALHO *cabecalho, char *campoIndexado,
                 if(strcmp(getChaveBuscaRegIndiceStr(indices[k]), valoresCampos[campoEscolhido]) > 0)
                     break;
             }
-            //não achou registros que satisfazem as condições de busca
-            if(flagPrintInexistente)
-                printf("Registro inexistente.\n");
 
         }
         else{   //busca linear
-            buscaLinear(arqBin, cabecalho, m, nomesCampos, valoresCampos);
+            removeLinearInt(arqBin, cabecalho, m, nomesCampos, valoresCampos, NULL, 0);
         }
     }
 

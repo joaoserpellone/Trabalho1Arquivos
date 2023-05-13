@@ -1,5 +1,5 @@
-all: 
-	gcc -o programaTrab *.c -g
+all:
+	gcc -o programaTrab *.c -std=c99
 clean:
 	rm *.o
 run:
