@@ -275,6 +275,8 @@ int main() {
 
         if(strcmp(tipoDado, "inteiro") == 0)
             deletFromWhereInt(arqBin, cabecalho, campoIndexado, nomeArqIndice, n);
+        else if(strcmp(tipoDado, "string") == 0)
+            deletFromWhereStr(arqBin, cabecalho, campoIndexado, nomeArqIndice, n);
 
         fclose(arqBin);
         

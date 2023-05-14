@@ -143,8 +143,8 @@ int delet_verificaCampos(FICHA_CRIME *fichaCrime, int m, char **nomesCampos, cha
 *   Função que busca linearmente um registro indices
 *   pelo byteOffSet e eretorna sua posicao no vetor de indices
 */
-int buscaIndiceRemovidoInt(REG_INDICE_INT **indices, long int byteOffSet){
-    for(int i = 0; i < sizeof(indices)/sizeof(REG_INDICE_INT*); i++){
+int buscaIndiceRemovidoInt(REG_INDICE_INT **indices, long int byteOffSet, int qtdReg, int qtdIndicesRem){
+    for(int i = 0; i < qtdReg - qtdIndicesRem; i++){
         if(getByteOffSetIndiceInt(indices[i]) == byteOffSet)
             return i;
     }
@@ -152,29 +152,28 @@ int buscaIndiceRemovidoInt(REG_INDICE_INT **indices, long int byteOffSet){
     return -1;
 }
 
-void shiftVetorIndicesInt(REG_INDICE_INT **indices, int k){
+/*
+*   Função que da shift no vetor de indices em uma posição k
+*   esta posição é sobrescrita k+1 e portanto removida
+*/
+void shiftVetorIndicesInt(REG_INDICE_INT **indices, int k, int qtdReg, int qtdIndicesRem){
     if(k != -1){
-        for(int i = k; i < sizeof(indices)/sizeof(REG_INDICE_INT*) - 1; i++){
-            setChaveBuscaRegIndiceInt(indices[i], getChaveBuscaRegIndiceInt(indices[i+1]));
-            setByteOffSetIndiceInt(indices[i], getByteOffSetIndiceInt(indices[i+1]));
+        for(int i = k; i < qtdReg - qtdIndicesRem; i++){
+            atribuiRegistroIndiceInt(indices[i], indices[i+1]);
         }
-        indices = realloc(indices, sizeof(indices) - 1);
+        indices = realloc(indices, (qtdReg - qtdIndicesRem)*sizeof(REG_INDICE_INT*));
     }
 }
 
 /*
 *   Funcao que remove com uma busca linear registros
-*   de acordo com os requisitos de busca,
-*    retorna 
+*   de acordo com os requisitos de busca
 */
-void removeLinearInt(FILE *arqBin, CABECALHO *cabecalho, int m,char **nomesCampos, char **valoresCampos, REG_INDICE_INT **indices, int *qtdIndicesRem){
-    fseek(arqBin, 0, SEEK_SET);
+void removeLinearInt(FILE *arqBin, CABECALHO *cabecalho, int m,char **nomesCampos, char **valoresCampos, REG_INDICE_INT **indices, int qtdReg, int *qtdIndicesRem){
+    fseek(arqBin, 17, SEEK_SET);
 
     FICHA_CRIME *fichaCrime;
     long int byteOffSet = 17;
-
-    //flagPrintInexistente = 1 não achou registro, flag = 0 achou registros
-    int flagPrintInexistente = 1;
 
     //loop de busca de registros
     for(int i = 0; i < getNroRegArqCabecalho(cabecalho); i++){
@@ -185,23 +184,20 @@ void removeLinearInt(FILE *arqBin, CABECALHO *cabecalho, int m,char **nomesCampo
 
         //satisfez criterio de buscas
         if(flagAchou == 1 && getRemovido(fichaCrime) != '1'){
-            flagPrintInexistente = 0;
             char removido = '1';
             //altera removido para '1' no arquivo de registros
-            setRemovido(fichaCrime, removido);
-
-            printRegistro(fichaCrime);
-
             //aponta para o comeco do registro e escreve o removido
             fseek(arqBin, byteOffSet, SEEK_SET);
             fwrite(&removido, 1, 1, arqBin);
 
             //busca no vetor de indices o registro com o mesmo byteOffSet e shifta o vetor
-            int k = buscaIndiceRemovidoInt(indices, byteOffSet);
-            shiftVetorIndicesInt(indices, k);
-
+            int k = buscaIndiceRemovidoInt(indices, byteOffSet, qtdReg, *qtdIndicesRem);
             //atualiza contador de removidos
-            *qtdIndicesRem++;
+            (*qtdIndicesRem)++;
+            shiftVetorIndicesInt(indices, k, qtdReg, *qtdIndicesRem);
+
+            //retorno ponteiro para posicao original
+            fseek(arqBin, byteOffSet + calculaTamFichaCrime(fichaCrime), SEEK_SET);
         }
         //calcula o byteOffSet do proximo registro        
         byteOffSet += calculaTamFichaCrime(fichaCrime);
@@ -238,6 +234,8 @@ void deletFromWhereInt(FILE *arqBin, CABECALHO *cabecalho, char *campoIndexado, 
 
     //faz leitura do arquivo de indices
     REG_INDICE_INT **indices = leituraArquivoIndiceInt(nomeArqIndice, &qtdReg);
+    for(int i = 0; i<qtdReg; i++)
+        printf("%d\n", getChaveBuscaRegIndiceInt(indices[i]));
     //numero de pares de busca
     int m;
     for(int i=0; i<n; i++){
@@ -268,17 +266,19 @@ void deletFromWhereInt(FILE *arqBin, CABECALHO *cabecalho, char *campoIndexado, 
 
         //busca por campo indexado
         if(flag){
-            printf("Remocao indexada: ");
             //transforma o valor do campo escolhido em int  
             int valorCampoEscolhido = atoi(valoresCampos[campoEscolhido]);
 
             FICHA_CRIME *fichaCrime;
 
-            //flagPrintInexistente = 1 não achou registro, flag = 0 achou registros
-            int flagPrintInexistente = 1;
             //itera sobre as chaves de busca ate achar indice igual ao valor escolhido sobre campo
             //ou até o fim dos indices
             for(int k = 0; k < qtdReg - qtdIndicesRem; k++){
+
+                //sai do loop caso ja tenha ultrapassado o valor da chave de busca
+                if(getChaveBuscaRegIndiceInt(indices[k]) > valorCampoEscolhido)
+                    break;
+
                 if(valorCampoEscolhido == getChaveBuscaRegIndiceInt(indices[k])){
                     //calcula byteOffSet e aponta para a posição calculada
                     long int byteOffSet = getByteOffSetIndiceInt(indices[k]);
@@ -288,50 +288,114 @@ void deletFromWhereInt(FILE *arqBin, CABECALHO *cabecalho, char *campoIndexado, 
                     //verifica os campos do registro
                     int flagAchou = delet_verificaCampos(fichaCrime, m, nomesCampos, valoresCampos, campoEscolhido);
 
-                    if(flagAchou == 1){
-                        flagPrintInexistente = 0;
+                    if(flagAchou == 1 && getRemovido(fichaCrime) != '1'){
                         char removido = '1';
                         //altera removido para '1' no arquivo de registros
-                        fseek(arqBin, -1*calculaTamFichaCrime(fichaCrime), SEEK_CUR);
+                        fseek(arqBin, byteOffSet, SEEK_SET);
                         fwrite(&removido, 1, 1, arqBin);
-
-                        //remove registro do vetor de indices shiftando o vetor
-                        shiftVetorIndicesInt(indices, k);
 
                         //atualiza a contagem de registros removidos
                         qtdIndicesRem++;
-                        printRegistro(fichaCrime);
+                        //remove registro do vetor de indices shiftando o vetor
+                        shiftVetorIndicesInt(indices, k, qtdReg, qtdIndicesRem);
+
+                        k--;
                     }
 
                     destroiFichaCrime(&fichaCrime);
-                }
-
-                //ja passou do indice de busca
-                if(getChaveBuscaRegIndiceInt(indices[k]) > valorCampoEscolhido)
-                    break;
+                }                
             }
-            if(flagPrintInexistente)
-                    printf("Num Acho\n");
+
         }                    
         else{   //remocao linear
-            removeLinearInt(arqBin, cabecalho, m, nomesCampos, valoresCampos, indices, &qtdIndicesRem);
+            removeLinearInt(arqBin, cabecalho, m, nomesCampos, valoresCampos, indices, qtdReg, &qtdIndicesRem);
         }
 
         delet_destroiVetorString(nomesCampos, m);
         delet_destroiVetorString(valoresCampos, m);
     } 
-
     atualizaCabecalhoRemovidos(arqBin, qtdIndicesRem);
-    escreve_arquivo_indice_int(indices, nomeArqIndice);
+    escreve_arquivo_indice_int(indices, nomeArqIndice, qtdReg, qtdIndicesRem);
+
 
     //apaga vetor de indices
-    for(int j = 0; j<qtdReg; j++)
+    for(int j = 0; j<qtdReg - qtdIndicesRem; j++)
         destroiRegIndiceInt(&indices[j]);
     free(indices);
 }
 
+/*
+*   Função que busca linearmente um registro indices
+*   pelo byteOffSet e eretorna sua posicao no vetor de indices
+*/
+int buscaIndiceRemovidoStr(REG_INDICE_STR **indices, long int byteOffSet, int qtdReg, int qtdIndicesRem){
+    for(int i = 0; i < qtdReg - qtdIndicesRem; i++){
+        if(getByteOffSetIndiceStr(indices[i]) == byteOffSet)
+            return i;
+    }
+
+    return -1;
+}
+
+/*
+*   Função que da shift no vetor de indices em uma posição k
+*   esta posição é sobrescrita  pelo k+1 e portanto removida
+*/
+void shiftVetorIndicesStr(REG_INDICE_STR **indices, int k, int qtdReg, int qtdIndicesRem){
+    if(k != -1){
+        for(int i = k; i < qtdReg - qtdIndicesRem; i++){
+            atribuiRegistroIndiceStr(indices[i], indices[i+1]);
+        }
+        indices = realloc(indices, (qtdReg - qtdIndicesRem)*sizeof(REG_INDICE_STR*));
+    }
+}
+
+/*
+*   Funcao que remove com uma busca linear registros
+*   de acordo com os requisitos de busca
+*/
+void removeLinearStr(FILE *arqBin, CABECALHO *cabecalho, int m,char **nomesCampos, char **valoresCampos, REG_INDICE_STR **indices, int qtdReg, int *qtdIndicesRem){
+    fseek(arqBin, 17, SEEK_SET);
+
+    FICHA_CRIME *fichaCrime;
+    long int byteOffSet = 17;
+
+    //loop de busca de registros
+    for(int i = 0; i < getNroRegArqCabecalho(cabecalho); i++){
+        fichaCrime = leituraBinario(arqBin);
+        
+        //verifica se registro satisfaz os criteiros de busca
+        int flagAchou = delet_verificaCampos(fichaCrime, m, nomesCampos, valoresCampos, -1);
+        //satisfez criterio de buscas
+        if(flagAchou == 1 && getRemovido(fichaCrime) != '1'){
+            char removido = '1';
+            //altera removido para '1' no arquivo de registros
+            //aponta para o comeco do registro e escreve o removido
+            fseek(arqBin, byteOffSet, SEEK_SET);
+            fwrite(&removido, 1, 1, arqBin);
+
+            //busca no vetor de indices o registro com o mesmo byteOffSet e shifta o vetor
+            int k = buscaIndiceRemovidoStr(indices, byteOffSet, qtdReg, *qtdIndicesRem);
+            //atualiza contador de removidos
+            (*qtdIndicesRem)++;
+            shiftVetorIndicesStr(indices, k, qtdReg, *qtdIndicesRem);
+
+            //retorno ponteiro para posicao original
+            fseek(arqBin, byteOffSet + calculaTamFichaCrime(fichaCrime), SEEK_SET);
+        }
+        //calcula o byteOffSet do proximo registro        
+        byteOffSet += calculaTamFichaCrime(fichaCrime);
+        destroiFichaCrime(&fichaCrime);
+    }
+        
+}
+
 void deletFromWhereStr(FILE *arqBin, CABECALHO *cabecalho, char *campoIndexado, char *nomeArqIndice, int n){
+    //qtde de registros de indices
     int qtdReg = 0;
+    //qtde de registros de indices removidos
+    int qtdIndicesRem = 0;
+
     //faz leitura do arquivo de indices
     REG_INDICE_STR **indices = leituraArquivoIndiceStr(nomeArqIndice, &qtdReg);
     //numero de pares de busca
@@ -364,40 +428,56 @@ void deletFromWhereStr(FILE *arqBin, CABECALHO *cabecalho, char *campoIndexado, 
                 valoresCampos[campoEscolhido][12] = '\0';
             }
         }
+
         //busca por campo indexado
         if(flag){
             FICHA_CRIME *fichaCrime;
 
-            //flagPrintInexistente = 1 não achou registro, flag = 0 achou registros
-            int flagPrintInexistente = 1;
             //itera sobre as chaves de busca ate achar indice igual ao valor escolhido sobre campo
             //ou até o fim dos indices
-            for(int k = 0; k < qtdReg; k++){
+            for(int k = 0; k < qtdReg - qtdIndicesRem; k++){
+
+                //sai do loop caso ja tenha ultrapassado o valor da chave de busca
+                if(strcmp(getChaveBuscaRegIndiceStr(indices[k]), valoresCampos[campoEscolhido]) > 0)
+                    break;
+
                 if(strcmp(getChaveBuscaRegIndiceStr(indices[k]), valoresCampos[campoEscolhido]) == 0){
                     //calcula byteOffSet e aponta para a posição calculada
                     long int byteOffSet = getByteOffSetIndiceStr(indices[k]);
                     fseek(arqBin, byteOffSet, SEEK_SET);
                     fichaCrime = leituraBinario(arqBin);
+                    
                     //verifica os campos do registro
                     int flagAchou = delet_verificaCampos(fichaCrime, m, nomesCampos, valoresCampos, campoEscolhido);
 
-                    if(flagAchou == 1)
-                        flagPrintInexistente = 0;
+                    if(flagAchou == 1 && getRemovido(fichaCrime) != '1'){
+                        char removido = '1';
+                        //altera removido para '1' no arquivo de registros
+                        fseek(arqBin, byteOffSet, SEEK_SET);
+                        fwrite(&removido, 1, 1, arqBin);
+
+                        //atualiza a contagem de registros removidos
+                        qtdIndicesRem++;
+                        //remove registro do vetor de indices shiftando o vetor
+                        shiftVetorIndicesStr(indices, k, qtdReg, qtdIndicesRem);
+                        k--;
+                    }
                         
                     destroiFichaCrime(&fichaCrime);
                 }
-                if(strcmp(getChaveBuscaRegIndiceStr(indices[k]), valoresCampos[campoEscolhido]) > 0)
-                    break;
             }
 
         }
         else{   //busca linear
-            removeLinearInt(arqBin, cabecalho, m, nomesCampos, valoresCampos, NULL, 0);
+            removeLinearStr(arqBin, cabecalho, m, nomesCampos, valoresCampos, indices, qtdReg, &qtdIndicesRem);
         }
     }
 
+    atualizaCabecalhoRemovidos(arqBin, qtdIndicesRem);
+    escreve_arquivo_indice_str(indices, nomeArqIndice, qtdReg, qtdIndicesRem);
+
     //apaga vetor de indices
-    for(int j = 0; j<qtdReg; j++)
+    for(int j = 0; j<qtdReg - qtdIndicesRem; j++)
         destroiRegIndiceStr(&indices[j]);
     free(indices);
 }

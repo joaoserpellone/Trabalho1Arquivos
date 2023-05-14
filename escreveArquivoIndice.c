@@ -143,27 +143,27 @@ void cria_arquivo_indice_int(FILE *arqBin, CABECALHO *cabecalho, char *nomeArqIn
     fclose(arqIndice);
 }
 
-void escreve_arquivo_indice_int(REG_INDICE_INT **r, char *nomeArquivo){
+void escreve_arquivo_indice_int(REG_INDICE_INT **r, char *nomeArquivo, int qtdReg, int qtdIndicesRem){
     FILE *arqIndices = fopen(nomeArquivo, "wb");
 
     //escrita previa no cabecalho
     char status = '0';
-    int qtdReg = 0;
     fwrite(&status, 1, 1, arqIndices);
     fwrite(&qtdReg, 4, 1, arqIndices);
 
     //escrita dos registros no arquivo
-    for(int i = 0; i < sizeof(r)/sizeof(REG_INDICE_INT*); i++){
-        qtdReg++;
+    for(int i = 0; i < qtdReg - qtdIndicesRem; i++){
         int chaveBusca = getChaveBuscaRegIndiceInt(r[i]);
         long int byteOffSet = getByteOffSetIndiceInt(r[i]);
         fwrite(&chaveBusca, 4, 1, arqIndices);
         fwrite(&byteOffSet, 8, 1, arqIndices);
     }
 
-    qtdReg++;
+    qtdReg -= qtdIndicesRem;
     //atualiza cabecalho e fecha arquivo
     fseek(arqIndices, 0, SEEK_SET);
+    status = '1';
+    fwrite(&status, 1, 1, arqIndices);
     fwrite(&qtdReg, 4, 1, arqIndices);
 
     fclose(arqIndices);
@@ -331,4 +331,32 @@ void cria_arquivo_indice_str(FILE *arqBin, CABECALHO *cabecalho, char *nomeArqIn
     fwrite(&status, 1, 1, arqIndice);
 
     fclose(arqIndice);
+}
+
+void escreve_arquivo_indice_str(REG_INDICE_STR **r, char *nomeArquivo, int qtdReg, int qtdIndicesRem){
+    FILE *arqIndices = fopen(nomeArquivo, "wb");
+
+    //escrita previa no cabecalho
+    char status = '0';
+    fwrite(&status, 1, 1, arqIndices);
+    fwrite(&qtdReg, 4, 1, arqIndices);
+
+    //escrita dos registros no arquivo
+    for(int i = 0; i < qtdReg - qtdIndicesRem; i++){
+        char chaveBusca[13];
+        strcpy(chaveBusca, getChaveBuscaRegIndiceStr(r[i]));
+        trataChaveBusca(chaveBusca);
+        long int byteOffSet = getByteOffSetIndiceStr(r[i]);
+        fwrite(&chaveBusca, 12, 1, arqIndices);
+        fwrite(&byteOffSet, 8, 1, arqIndices);
+    }
+
+    qtdReg -= qtdIndicesRem;
+    //atualiza cabecalho e fecha arquivo
+    fseek(arqIndices, 0, SEEK_SET);
+    status = '1';
+    fwrite(&status, 1, 1, arqIndices);
+    fwrite(&qtdReg, 4, 1, arqIndices);
+
+    fclose(arqIndices);
 }
