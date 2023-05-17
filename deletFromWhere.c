@@ -234,8 +234,6 @@ void deletFromWhereInt(FILE *arqBin, CABECALHO *cabecalho, char *campoIndexado, 
 
     //faz leitura do arquivo de indices
     REG_INDICE_INT **indices = leituraArquivoIndiceInt(nomeArqIndice, &qtdReg);
-    for(int i = 0; i<qtdReg; i++)
-        printf("%d\n", getChaveBuscaRegIndiceInt(indices[i]));
     //numero de pares de busca
     int m;
     for(int i=0; i<n; i++){
